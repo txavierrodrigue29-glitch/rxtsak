@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestion Association</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+  body { background:#f4f6f9; }
+  .hidden { display:none !important; }
+  img.profile { width:40px; height:40px; border-radius:50%; margin-right:5px; object-fit:cover; }
+  footer { text-align:center; margin-top:20px; border-top:1px solid #ccc; padding:10px; font-size:14px; }
+  #movementTable tbody tr:nth-child(odd){ background:#f9f9f9; }
+  #movementTable tbody tr:nth-child(even){ background:#ffffff; }
+  #movementTable tbody tr:hover{ background:#e6f7ff; cursor:pointer; }
+  .requestBox{ border:1px solid #ccc; padding:5px; margin-bottom:5px; border-radius:5px; background:#fff; }
+</style>
+</head>
+<body>
+
+<div class="container py-3">
+
+  <!-- LOGIN -->
+  <div id="loginDiv">
+    <h3 class="mb-3">🔐 Connexion</h3>
+    <input type="text" id="loginUsername" class="form-control mb-2" placeholder="Nom d’utilisateur">
+    <input type="password" id="loginPassword" class="form-control mb-2" placeholder="Mot de passe">
+    <button class="btn btn-primary w-100 mb-2" onclick="login()">Se connecter</button>
+    <div id="loginMsg"></div>
+  </div>
+
+  <!-- APP -->
+  <div id="appContent" class="d-none">
+
+    <!-- Infos utilisateur connecté -->
+    <div class="mb-3 p-2 bg-white rounded shadow-sm">
+      <img id="currentUserPhoto" class="profile">
+      Connecté : <b id="currentUserName"></b> (<span id="currentUserRole"></span>)
+      <button class="btn btn-sm btn-outline-danger float-end" onclick="logout()">Déconnexion</button>
+    </div>
+
+    <!-- Gestion membres -->
+    <div id="memberSection" class="card shadow-sm mb-3 d-none">
+      <div class="card-header">👥 Ajouter Membre</div>
+      <div class="card-body row g-2">
+        <div class="col-md"><input type="text" id="memberName" class="form-control" placeholder="Nom"></div>
+        <div class="col-md"><input type="text" id="memberPhone" class="form-control" placeholder="Téléphone"></div>
+        <div class="col-md"><input type="file" id="memberPhoto" class="form-control"></div>
+        <div class="col-md-auto"><button class="btn btn-success w-100" onclick="addMember()">Ajouter</button></div>
+      </div>
+    </div>
+
+    <!-- Gestion utilisateurs -->
+    <div id="userAdminSection" class="card shadow-sm mb-3 d-none">
+      <div class="card-header">👤 Gestion des utilisateurs</div>
+      <div class="card-body">
+        <input type="text" id="newUsername" class="form-control mb-2" placeholder="Nom d’utilisateur">
+        <input type="password" id="newPassword" class="form-control mb-2" placeholder="Mot de passe">
+        <select id="newUserMember" class="form-select mb-2"></select>
+        <select id="newUserRole" class="form-select mb-2">
+          <option value="user">Utilisateur</option>
+          <option value="admin">Administrateur</option>
+        </select>
+        <button class="btn btn-success w-100 mb-2" onclick="addUser()">Créer utilisateur</button>
+        <button class="btn btn-warning w-100 mb-2" onclick="resetAll()">🔄 Réinitialiser tout</button>
+      </div>
+    </div>
+
+    <!-- Ajouter mouvement -->
+    <div id="movementSection" class="card shadow-sm mb-3 d-none">
+      <div class="card-header">💸 Ajouter Mouvement</div>
+      <div class="card-body row g-2">
+        <div class="col-md"><select id="movementMember" class="form-select"></select></div>
+        <div class="col-md">
+          <select id="movementType" class="form-select">
+            <option value="Sanction">Sanction</option>
+            <option value="Relicat">Relicat</option>
+            <option value="Achat">Achat</option>
+            <option value="Intérêt">Intérêt</option>
+            <option value="Inscription">Inscription</option>
+            <option value="Banque">Banque</option>
+            <option value="Dette">Dette</option>
+            <option value="Dépense">Dépense</option>
+            <option value="Secours">Secours</option> <!-- ajouté -->
+          </select>
+        </div>
+        <div class="col-md"><input type="number" id="movementAmount" class="form-control" placeholder="Montant"></div>
+        <div class="col-md-auto"><button class="btn btn-success w-100" onclick="addMovement()">Ajouter</button></div>
+      </div>
+    </div>
+
+    <!-- Totaux -->
+    <div id="totalsSection" class="card shadow-sm mb-3">
+      <div class="card-header">📊 Totaux</div>
+      <div class="card-body row text-center">
+        <div class="col"><b>Total Secours :</b> <span id="totalSecours">0</span> FCFA</div>
+        <div class="col"><b>Total Banque :</b> <span id="totalBanque">0</span> FCFA</div>
+        <div class="col d-none adminOnly"><b>Caisse Association :</b> <span id="caisseAssociation">0</span> FCFA</div>
+        <div class="col d-none adminOnly"><b>Dettes :</b> <span id="totalDettes">0</span> FCFA</div>
+        <div class="col d-none adminOnly"><b>Dépenses :</b> <span id="totalDepenses">0</span> FCFA</div>
+        <div class="col d-none adminOnly"><b>Solde Bancaire :</b> <span id="soldeBancaire">0</span> FCFA</div>
+      </div>
+    </div>
+
+    <!-- Tableau mouvements -->
+    <div class="card shadow-sm mb-3">
+      <div class="card-header">📄 Historique des mouvements</div>
+      <div class="card-body table-responsive">
+        <button class="btn btn-primary mb-2" onclick="exportPDF()">Exporter PDF</button>
+        <table id="movementTable" class="table table-bordered table-striped">
+          <thead class="table-light">
+            <tr>
+              <th>Membre</th><th>Type</th><th>Montant</th><th>Date</th><th>Action</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Requêtes -->
+    <div id="requestSection" class="card shadow-sm mb-3">
+      <div class="card-header">📩 Requêtes</div>
+      <div class="card-body">
+        <!-- Utilisateur -->
+        <div id="userRequestSection" class="d-none">
+          <textarea id="userRequestText" class="form-control mb-2" rows="3" placeholder="Votre message..."></textarea>
+          <button class="btn btn-primary w-100 mb-2" onclick="sendRequest()">Envoyer</button>
+          <h6>📜 Historique de vos requêtes</h6>
+          <div id="myRequests"></div>
+        </div>
+        <!-- Admin -->
+        <div id="adminRequestSection" class="d-none">
+          <h6>📥 Requêtes des utilisateurs</h6>
+          <div id="requestsList"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<footer>
+Logiciel de gestion des associations développé par Rodrigue Xavier Tsakem | Tel: 654882661 / 659302218 | <span id="dateTime"></span>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+// --- Données ---
+let users=JSON.parse(localStorage.getItem("users"))||[{username:"admin",password:"admin123",role:"admin",memberName:"ADMIN",photo:""}];
+let members=JSON.parse(localStorage.getItem("members"))||[];
+let mouvements=JSON.parse(localStorage.getItem("mouvements"))||[];
+let requests=JSON.parse(localStorage.getItem("requests"))||[];
+let currentUser=null;
+let editId=null;
+
+// --- Sauvegardes ---
+function saveUsers(){ localStorage.setItem("users",JSON.stringify(users)); }
+function saveData(){ localStorage.setItem("members",JSON.stringify(members)); localStorage.setItem("mouvements",JSON.stringify(mouvements)); }
+function saveRequests(){ localStorage.setItem("requests",JSON.stringify(requests)); }
+
+// --- LOGIN ---
+function login(){
+  const username=document.getElementById("loginUsername").value.trim();
+  const password=document.getElementById("loginPassword").value;
+  const msg=document.getElementById("loginMsg");
+  const user=users.find(u=>u.username===username && u.password===password);
+  if(!user){ msg.textContent="❌ Identifiants incorrects"; msg.className="text-danger"; return; }
+  currentUser=user;
+  document.getElementById("loginDiv").classList.add("d-none");
+  document.getElementById("appContent").classList.remove("d-none");
+  document.getElementById("currentUserName").textContent=user.username;
+  document.getElementById("currentUserRole").textContent=user.role;
+  document.getElementById("currentUserPhoto").src=user.photo||"";
+  applyPermissions();
+  updateUI();
+}
+
+// --- LOGOUT ---
+function logout(){ currentUser=null;
+document.getElementById("appContent").classList.add("d-none");
+document.getElementById("loginDiv").classList.remove("d-none");
+document.getElementById("loginUsername").value="";
+document.getElementById("loginPassword").value="";
+document.getElementById("loginMsg").textContent="";
+}
+
+// --- Permissions ---
+function applyPermissions(){
+  const isAdmin = currentUser.role === "admin";
+  document.getElementById("userAdminSection").classList.toggle("d-none", !isAdmin);
+  document.getElementById("memberSection").classList.toggle("d-none", !isAdmin);
+  document.getElementById("movementSection").classList.toggle("d-none", !isAdmin);
+  document.getElementById("userRequestSection").classList.toggle("d-none", isAdmin);
+  document.getElementById("adminRequestSection").classList.toggle("d-none", !isAdmin);
+  document.querySelectorAll(".adminOnly").forEach(el=>el.classList.toggle("d-none", !isAdmin));
+}
+
+// --- Ajouter membre ---
+function addMember(){
+  if(currentUser.role!=="admin"){ alert("❌ Accès refusé."); return; }
+  const name=document.getElementById("memberName").value.trim();
+  const phone=document.getElementById("memberPhone").value.trim();
+  const photoInput=document.getElementById("memberPhoto");
+  if(!name || !phone){ alert("⚠ Veuillez renseigner le nom et le téléphone."); return; }
+  let reader=new FileReader();
+  reader.onload=function(e){
+    members.push({name, phone, photo:e.target.result});
+    saveData(); updateUI();
+    document.getElementById("memberName").value="";
+    document.getElementById("memberPhone").value="";
+    document.getElementById("memberPhoto").value="";
+    alert("✅ Membre ajouté !");
+  }
+  if(photoInput.files[0]) reader.readAsDataURL(photoInput.files[0]);
+  else { members.push({name, phone, photo:""}); saveData(); updateUI(); alert("✅ Membre ajouté !"); }
+}
+
+// --- Ajouter utilisateur ---
+function addUser(){
+  if(currentUser.role!=="admin"){ alert("❌ Accès refusé."); return; }
+  const username=document.getElementById("newUsername").value.trim();
+  const password=document.getElementById("newPassword").value.trim();
+  const memberName=document.getElementById("newUserMember").value;
+  const role=document.getElementById("newUserRole").value;
+  if(!username || !password || !memberName){ alert("⚠ Champs manquants."); return; }
+  if(users.find(u=>u.username===username)){ alert("⚠ Utilisateur déjà existant."); return; }
+  users.push({username,password,role,memberName,photo:""});
+  saveUsers(); alert("✅ Utilisateur créé !");
+  document.getElementById("newUsername").value="";
+  document.getElementById("newPassword").value="";
+}
+
+// --- Ajouter mouvement ---
+function addMovement(){
+  if(currentUser.role!=="admin"){ alert("❌ Accès refusé."); return; }
+  const member=document.getElementById("movementMember").value;
+  const type=document.getElementById("movementType").value;
+  const montant=parseFloat(document.getElementById("movementAmount").value);
+  if(!member || !type || isNaN(montant)) return;
+  let linkedUser = users.find(u=>u.memberName===member);
+  mouvements.push({user: linkedUser ? linkedUser.username : member, type, amount:montant, date:new Date().toLocaleString(), supprime:false});
+  saveData(); updateUI();
+  document.getElementById("movementAmount").value="";
+}
+
+// --- Réinitialiser tout ---
+function resetAll(){
+  if(!confirm("⚠ Voulez-vous vraiment tout réinitialiser ?")) return;
+  localStorage.clear();
+  location.reload();
+}
+
+// --- Affichage UI ---
+function updateUI(){
+  // Sélecteurs
+  const sel=document.getElementById("movementMember");
+  sel.innerHTML=""; members.forEach(m=>{ let opt=document.createElement("option"); opt.value=m.name; opt.textContent=m.name; sel.appendChild(opt); });
+  const selUser=document.getElementById("newUserMember");
+  selUser.innerHTML=""; members.forEach(m=>{ let opt=document.createElement("option"); opt.value=m.name; opt.textContent=m.name; selUser.appendChild(opt); });
+  
+  // Tableau mouvements
+  const tbody=document.querySelector("#movementTable tbody");
+  tbody.innerHTML="";
+  let visibleMouvements=currentUser.role==="admin"?mouvements:mouvements.filter(m=>m.user===currentUser.username && !m.supprime);
+  visibleMouvements.forEach((m,idx)=>{
+    let userObj=users.find(u=>u.username===m.user);
+    let displayName=userObj?userObj.memberName:m.user;
+    let mem=members.find(x=>x.name===displayName);
+    let photoHTML=mem && mem.photo? `<img src="${mem.photo}" class="profile">`:"";
+    let tr=document.createElement("tr");
+    tr.innerHTML=`<td>${photoHTML}${displayName}</td><td>${m.type}</td><td>${m.amount}</td><td>${m.date}</td>
+    <td>${currentUser.role==="admin"?`<button class="btn btn-sm btn-warning" onclick="editMovement(${idx})">✏️</button>
+    <button class="btn btn-sm btn-danger" onclick="deleteMovement(${idx})">🗑️</button>`:""}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  // Totaux
+  let totalSecours=0, totalBanque=0, caisseAssoc=0, totalDettes=0, totalDep=0;
+  mouvements.forEach(m=>{
+    if(m.type==="Secours") totalSecours+=m.amount;
+    if(m.type==="Banque") totalBanque+=m.amount;
+    if(["Relicat","Achat","Intérêt","Sanction","Inscription"].includes(m.type)) caisseAssoc+=m.amount;
+    if(m.type==="Dette") totalDettes+=m.amount;
+    if(m.type==="Dépense") totalDep+=m.amount;
+  });
+  document.getElementById("totalSecours").textContent=totalSecours;
+  document.getElementById("totalBanque").textContent=totalBanque;
+  document.getElementById("caisseAssociation").textContent=caisseAssoc;
+  document.getElementById("totalDettes").textContent=totalDettes;
+  document.getElementById("totalDepenses").textContent=totalDep;
+  document.getElementById("soldeBancaire").textContent=caisseAssoc + totalSecours - totalDettes - totalDep;
+
+  displayRequests();
+  displayUserRequests();
+}
+
+// --- Edit/Delete mouvement ---
+function editMovement(idx){
+  let m=mouvements[idx];
+  let newAmount=prompt("Modifier le montant :", m.amount);
+  if(newAmount!==null){ m.amount=parseFloat(newAmount); saveData(); updateUI(); }
+}
+function deleteMovement(idx){
+  if(!confirm("Supprimer ce mouvement ?")) return;
+  mouvements[idx].supprime=true; saveData(); updateUI();
+}
+
+// --- Requêtes ---
+function sendRequest(){
+  const text=document.getElementById("userRequestText").value.trim();
+  if(!text) return;
+  requests.push({user:currentUser.username,message:text,date:new Date().toLocaleString(),reply:""});
+  saveRequests(); alert("✅ Requête envoyée !");
+  document.getElementById("userRequestText").value="";
+  displayRequests(); displayUserRequests();
+}
+function replyRequest(index){
+  let rep=prompt("Réponse de l’administrateur :");
+  if(rep!==null && rep.trim()!==""){
+    requests[index].reply=rep+" (le "+new Date().toLocaleString()+")";
+    saveRequests(); displayRequests(); alert("✅ Réponse envoyée !");
+  }
+}
+function displayRequests(){
+  const list=document.getElementById("requestsList");
+  list.innerHTML="";
+  requests.forEach((r,idx)=>{
+    let div=document.createElement("div");
+    div.className="requestBox";
+    div.innerHTML=`<b>${r.user}</b> | ${r.date}<br>${r.message}
+    <div class="mt-1 text-primary"><b>Réponse :</b> ${r.reply || "❌ Pas encore de réponse"}</div>
+    ${currentUser.role==="admin"?`<button class="btn btn-sm btn-success mt-1" onclick="replyRequest(${idx})">Répondre</button>`:""}`;
+    list.appendChild(div);
+  });
+}
+function displayUserRequests(){
+  const myDiv=document.getElementById("myRequests");
+  if(!myDiv) return;
+  myDiv.innerHTML="";
+  const myReq=requests.filter(r=>r.user===currentUser.username);
+  myReq.forEach(r=>{
+    let div=document.createElement("div");
+    div.className="requestBox";
+    div.innerHTML=`<b>Envoyé le ${r.date}</b><br>${r.message}
+    <div class="mt-1 text-primary"><b>Réponse :</b> ${r.reply || "⏳ En attente de réponse"}</div>`;
+    myDiv.appendChild(div);
+  });
+}
+
+// --- Export PDF ---
+async function exportPDF(){
+  const { jsPDF }=window.jspdf;
+  const doc=new jsPDF();
+  const title=currentUser.role==="admin"?"BILAN ANNUEL DE AMIS SOLIDAIRES":`BILAN ANNUEL DE ${users.find(u=>u.username===currentUser.username).memberName}`;
+  doc.setFontSize(14); doc.text(title,10,10);
+  let y=20;
+  let visibleMouvements=currentUser.role==="admin"?mouvements:mouvements.filter(m=>m.user===currentUser.username);
+  visibleMouvements.forEach(m=>{
+    let userObj=users.find(u=>u.username===m.user);
+    let displayName=userObj?userObj.memberName:m.user;
+    let mem=members.find(x=>x.name===displayName);
+    let phone=mem?mem.phone:"";
+    doc.text(`${m.date} | ${displayName} (${phone}) | ${m.type} | ${m.amount} FCFA ${m.supprime?"(Supprimé)":""}`,10,y);
+    y+=8; if(y>280){ doc.addPage(); y=20; }
+  });
+  doc.save("mouvements.pdf");
+}
+
+// --- Init ---
+window.onload=()=>{ updateUI(); }
+function updateDateTime(){ document.getElementById("dateTime").textContent=new Date().toLocaleString(); }
+setInterval(updateDateTime,1000);
+</script>
+</body>
+</html>
